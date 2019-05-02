@@ -1,7 +1,6 @@
 package control
 
 import (
-	"bufio"
 	"context"
 	cryptorand "crypto/rand"
 	"crypto/rsa"
@@ -283,16 +282,24 @@ func prepare(config *config.Control, runtime *config.ControlRuntime) error {
 		return err
 	}
 
+	if err := genKubeconfig(config, runtime); err != nil {
+		return err
+	}
+
 	return readTokens(runtime)
 }
 
-func readTokens(runtime *config.ControlRuntime) error {
-	f, err := os.Open(runtime.PasswdFile)
+func readTokenFile(passwdFile string) (map[string]string, error) {
+	f, err := os.Open(passwdFile)
 	if err != nil {
-		return err
+		return nil, err
 	}
+	defer f.Close()
+
 	reader := csv.NewReader(f)
 	reader.FieldsPerRecord = -1
+
+	tokens := map[string]string{}
 
 	for {
 		record, err := reader.Read()
@@ -300,18 +307,27 @@ func readTokens(runtime *config.ControlRuntime) error {
 			break
 		}
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if len(record) < 2 {
 			continue
 		}
+		tokens[record[1]] = record[0]
+	}
+	return tokens, nil
+}
 
-		switch record[1] {
-		case "node":
-			runtime.NodeToken = "node:" + record[0]
-		case "admin":
-			runtime.ClientToken = "admin:" + record[0]
-		}
+func readTokens(runtime *config.ControlRuntime) error {
+	tokens, err := readTokenFile(runtime.PasswdFile)
+	if err != nil {
+		return err
+	}
+
+	if nodeToken, ok := tokens["node"]; ok {
+		runtime.NodeToken = "node:" + nodeToken
+	}
+	if clientToken, ok := tokens["admin"]; ok {
+		runtime.ClientToken = "admin:" + clientToken
 	}
 
 	return nil
@@ -328,31 +344,48 @@ func ensureNodeToken(config *config.Control, runtime *config.ControlRuntime) err
 	}
 	defer f.Close()
 
-	buf := &strings.Builder{}
-	scan := bufio.NewScanner(f)
-	for scan.Scan() {
-		line := scan.Text()
-		parts := strings.Split(line, ",")
-		if len(parts) < 4 {
-			continue
+	records := [][]string{}
+	reader := csv.NewReader(f)
+	for {
+		record, err := reader.Read()
+		if err == io.EOF {
+			break
 		}
-		if parts[1] == "node" {
-			if parts[0] == config.ClusterSecret {
+		if err != nil {
+			return err
+		}
+		if len(record) < 3 {
+			return fmt.Errorf("password file '%s' must have at least 3 columns (password, user name, user uid), found %d", runtime.PasswdFile, len(record))
+		}
+		if record[0] == "node" {
+			if record[0] == config.ClusterSecret {
 				return nil
 			}
-			parts[0] = config.ClusterSecret
-			line = strings.Join(parts, ",")
+			record[0] = config.ClusterSecret
+			records = append(records, record)
 		}
-		buf.WriteString(line)
-		buf.WriteString("\n")
-	}
-
-	if scan.Err() != nil {
-		return scan.Err()
 	}
 
 	f.Close()
-	return ioutil.WriteFile(runtime.PasswdFile, []byte(buf.String()), 0600)
+	return writePasswords(runtime.PasswdFile, records)
+}
+
+func writePasswords(passwdFile string, records [][]string) error {
+	out, err := os.Create(passwdFile + ".tmp")
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	if err := out.Chmod(0600); err != nil {
+		return err
+	}
+
+	if err := csv.NewWriter(out).WriteAll(records); err != nil {
+		return err
+	}
+
+	return os.Rename(passwdFile+".tmp", passwdFile)
 }
 
 func genUsers(config *config.Control, runtime *config.ControlRuntime) error {
@@ -377,10 +410,23 @@ func genUsers(config *config.Control, runtime *config.ControlRuntime) error {
 		nodeToken = config.ClusterSecret
 	}
 
-	passwd := fmt.Sprintf(`%s,admin,admin,system:masters
-%s,system,system,system:masters
-%s,node,node,system:masters
-`, adminToken, systemToken, nodeToken)
+	return writePasswords(runtime.PasswdFile, [][]string{
+		[]string{adminToken, "admin", "admin", "system:masters"},
+		[]string{systemToken, "system", "system", "system:masters"},
+		[]string{nodeToken, "node", "node", "system:masters"},
+	})
+}
+
+func genKubeconfig(config *config.Control, runtime *config.ControlRuntime) error {
+	tokens, err := readTokenFile(runtime.PasswdFile)
+	if err != nil {
+		return err
+	}
+	systemToken, ok := tokens["system"]
+	if !ok {
+		return fmt.Errorf("password file '%s' does not contain record for 'system'", runtime.PasswdFile)
+
+	}
 
 	caCertBytes, err := ioutil.ReadFile(runtime.ClientCA)
 	if err != nil {
@@ -389,12 +435,13 @@ func genUsers(config *config.Control, runtime *config.ControlRuntime) error {
 
 	caCert := base64.StdEncoding.EncodeToString(caCertBytes)
 
-	if err := kubeConfig(runtime.KubeConfigSystem, fmt.Sprintf("https://localhost:%d", config.ListenPort), caCert,
-		"system", systemToken); err != nil {
+	if err := kubeConfig(runtime.KubeConfigSystem,
+		fmt.Sprintf("https://localhost:%d", config.ListenPort),
+		caCert, "system", systemToken); err != nil {
 		return err
 	}
 
-	return ioutil.WriteFile(runtime.PasswdFile, []byte(passwd), 0600)
+	return nil
 }
 
 func getToken() (string, error) {
