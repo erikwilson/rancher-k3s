@@ -36,23 +36,23 @@ type Containerd struct {
 }
 
 type Agent struct {
-	NodeName           string
-	NodeCertFile       string
-	NodeKeyFile        string
-	ClusterCIDR        net.IPNet
-	ClusterDNS         net.IP
-	ClusterDomain      string
-	ResolvConf         string
-	RootDir            string
-	KubeConfig         string
-	NodeIP             string
-	RuntimeSocket      string
-	ListenAddress      string
-	CACertPath         string
-	CNIBinDir          string
-	CNIConfDir         string
-	ExtraKubeletArgs   []string
-	ExtraKubeProxyArgs []string
+	NodeName               string
+	ServingKubeAPICertFile string
+	ServingKubeAPIKeyFile  string
+	ClusterCIDR            net.IPNet
+	ClusterDNS             net.IP
+	ClusterDomain          string
+	ResolvConf             string
+	RootDir                string
+	KubeConfig             string
+	NodeIP                 string
+	RuntimeSocket          string
+	ListenAddress          string
+	CACertPath             string
+	CNIBinDir              string
+	CNIConfDir             string
+	ExtraKubeletArgs       []string
+	ExtraKubeProxyArgs     []string
 }
 
 type Control struct {
@@ -82,23 +82,23 @@ type Control struct {
 }
 
 type ControlRuntime struct {
-	TLSCert          string
-	TLSKey           string
-	TLSCA            string
-	TLSCAKey         string
-	TokenCA          string
-	TokenCAKey       string
-	ServiceKey       string
-	PasswdFile       string
-	KubeConfigSystem string
+	ClientKubeAPICert string
+	ClientKubeAPIKey  string
+	ClientCA          string
+	ClientCAKey       string
+	ServerCA          string
+	ServerCAKey       string
+	ServiceKey        string
+	PasswdFile        string
+	KubeConfigSystem  string
 
-	NodeCert      string
-	NodeKey       string
-	ClientToken   string
-	NodeToken     string
-	Handler       http.Handler
-	Tunnel        http.Handler
-	Authenticator authenticator.Request
+	ServingKubeAPICert string
+	ServingKubeAPIKey  string
+	ClientToken        string
+	NodeToken          string
+	Handler            http.Handler
+	Tunnel             http.Handler
+	Authenticator      authenticator.Request
 
 	RequestHeaderCA     string
 	RequestHeaderCAKey  string

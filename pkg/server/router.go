@@ -89,7 +89,7 @@ func nodeCrt(server *config.Control) http.Handler {
 			return
 		}
 
-		nodeKey, err := ioutil.ReadFile(server.Runtime.NodeKey)
+		nodeKey, err := ioutil.ReadFile(server.Runtime.ServingKubeAPIKey)
 		if err != nil {
 			sendError(err, resp)
 			return
@@ -101,13 +101,13 @@ func nodeCrt(server *config.Control) http.Handler {
 			return
 		}
 
-		caKeyBytes, err := ioutil.ReadFile(server.Runtime.TokenCAKey)
+		caKeyBytes, err := ioutil.ReadFile(server.Runtime.ServerCAKey)
 		if err != nil {
 			sendError(err, resp)
 			return
 		}
 
-		caBytes, err := ioutil.ReadFile(server.Runtime.TokenCA)
+		caBytes, err := ioutil.ReadFile(server.Runtime.ServerCA)
 		if err != nil {
 			sendError(err, resp)
 			return
@@ -156,7 +156,7 @@ func nodeKey(server *config.Control) http.Handler {
 			resp.WriteHeader(http.StatusNotFound)
 			return
 		}
-		http.ServeFile(resp, req, server.Runtime.NodeKey)
+		http.ServeFile(resp, req, server.Runtime.ServingKubeAPIKey)
 	})
 }
 

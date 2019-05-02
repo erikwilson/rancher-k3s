@@ -103,7 +103,7 @@ func controllerManager(cfg *config.Control, runtime *config.ControlRuntime) {
 		"service-account-private-key-file": runtime.ServiceKey,
 		"allocate-node-cidrs":              "true",
 		"cluster-cidr":                     cfg.ClusterIPRange.String(),
-		"root-ca-file":                     runtime.TokenCA,
+		"root-ca-file":                     runtime.ServerCA,
 		"port":                             "10252",
 		"bind-address":                     "127.0.0.1",
 		"secure-port":                      "0",
@@ -175,14 +175,14 @@ func apiServer(ctx context.Context, cfg *config.Control, runtime *config.Control
 	argsMap["insecure-port"] = "0"
 	argsMap["secure-port"] = strconv.Itoa(cfg.ListenPort)
 	argsMap["bind-address"] = localhostIP.String()
-	argsMap["tls-cert-file"] = runtime.TLSCert
-	argsMap["tls-private-key-file"] = runtime.TLSKey
+	argsMap["tls-cert-file"] = runtime.ClientKubeAPICert
+	argsMap["tls-private-key-file"] = runtime.ClientKubeAPIKey
 	argsMap["service-account-key-file"] = runtime.ServiceKey
 	argsMap["service-account-issuer"] = "k3s"
 	argsMap["api-audiences"] = "unknown"
 	argsMap["basic-auth-file"] = runtime.PasswdFile
-	argsMap["kubelet-client-certificate"] = runtime.NodeCert
-	argsMap["kubelet-client-key"] = runtime.NodeKey
+	argsMap["kubelet-client-certificate"] = runtime.ServingKubeAPICert
+	argsMap["kubelet-client-key"] = runtime.ServingKubeAPIKey
 	argsMap["requestheader-client-ca-file"] = runtime.RequestHeaderCA
 	argsMap["requestheader-allowed-names"] = requestHeaderCN
 	argsMap["proxy-client-cert-file"] = runtime.ClientAuthProxyCert
@@ -255,18 +255,17 @@ func prepare(config *config.Control, runtime *config.ControlRuntime) error {
 	os.MkdirAll(path.Join(config.DataDir, "tls"), 0700)
 	os.MkdirAll(path.Join(config.DataDir, "cred"), 0700)
 
-	name := "localhost"
-	runtime.TLSCert = path.Join(config.DataDir, "tls", name+".crt")
-	runtime.TLSKey = path.Join(config.DataDir, "tls", name+".key")
-	runtime.TLSCA = path.Join(config.DataDir, "tls", "ca.crt")
-	runtime.TLSCAKey = path.Join(config.DataDir, "tls", "ca.key")
-	runtime.TokenCA = path.Join(config.DataDir, "tls", "token-ca.crt")
-	runtime.TokenCAKey = path.Join(config.DataDir, "tls", "token-ca.key")
+	runtime.ClientKubeAPICert = path.Join(config.DataDir, "tls", "client-kube-apiserver.crt")
+	runtime.ClientKubeAPIKey = path.Join(config.DataDir, "tls", "client-kube-apiserver.key")
+	runtime.ClientCA = path.Join(config.DataDir, "tls", "client-ca.crt")
+	runtime.ClientCAKey = path.Join(config.DataDir, "tls", "client-ca.key")
+	runtime.ServerCA = path.Join(config.DataDir, "tls", "server-ca.crt")
+	runtime.ServerCAKey = path.Join(config.DataDir, "tls", "server-ca.key")
 	runtime.ServiceKey = path.Join(config.DataDir, "tls", "service.key")
 	runtime.PasswdFile = path.Join(config.DataDir, "cred", "passwd")
 	runtime.KubeConfigSystem = path.Join(config.DataDir, "cred", "kubeconfig-system.yaml")
-	runtime.NodeKey = path.Join(config.DataDir, "tls", "token-node.key")
-	runtime.NodeCert = path.Join(config.DataDir, "tls", "token-node.crt")
+	runtime.ServingKubeAPIKey = path.Join(config.DataDir, "tls", "serving-kube-apiserver.key")
+	runtime.ServingKubeAPICert = path.Join(config.DataDir, "tls", "serving-kube-apiserver.crt")
 	runtime.RequestHeaderCA = path.Join(config.DataDir, "tls", "request-header-ca.crt")
 	runtime.RequestHeaderCAKey = path.Join(config.DataDir, "tls", "request-header-ca.key")
 	runtime.ClientAuthProxyKey = path.Join(config.DataDir, "tls", "client-auth-proxy.key")
@@ -383,7 +382,7 @@ func genUsers(config *config.Control, runtime *config.ControlRuntime) error {
 %s,node,node,system:masters
 `, adminToken, systemToken, nodeToken)
 
-	caCertBytes, err := ioutil.ReadFile(runtime.TLSCA)
+	caCertBytes, err := ioutil.ReadFile(runtime.ClientCA)
 	if err != nil {
 		return err
 	}
@@ -408,10 +407,10 @@ func getToken() (string, error) {
 }
 
 func genCerts(config *config.Control, runtime *config.ControlRuntime) error {
-	if err := genTLSCerts(config, runtime); err != nil {
+	if err := genClientCerts(config, runtime); err != nil {
 		return err
 	}
-	if err := genTokenCerts(config, runtime); err != nil {
+	if err := genServerCerts(config, runtime); err != nil {
 		return err
 	}
 	if err := genRequestHeaderCerts(config, runtime); err != nil {
@@ -420,8 +419,8 @@ func genCerts(config *config.Control, runtime *config.ControlRuntime) error {
 	return nil
 }
 
-func genTLSCerts(config *config.Control, runtime *config.ControlRuntime) error {
-	regen, err := createSigningCertKey("k3s-tls", runtime.TLSCA, runtime.TLSCAKey)
+func genClientCerts(config *config.Control, runtime *config.ControlRuntime) error {
+	regen, err := createSigningCertKey("k3s-tls", runtime.ClientCA, runtime.ClientCAKey)
 	if err != nil {
 		return err
 	}
@@ -436,16 +435,16 @@ func genTLSCerts(config *config.Control, runtime *config.ControlRuntime) error {
 			DNSNames: []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes", "localhost"},
 			IPs:      []net.IP{apiServerServiceIP, localhostIP},
 		}, x509KeyServerOnly,
-		runtime.TLSCA, runtime.TLSCAKey,
-		runtime.TLSCert, runtime.TLSKey); err != nil {
+		runtime.ClientCA, runtime.ClientCAKey,
+		runtime.ClientKubeAPICert, runtime.ClientKubeAPIKey); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func genTokenCerts(config *config.Control, runtime *config.ControlRuntime) error {
-	regen, err := createSigningCertKey("k3s-token", runtime.TokenCA, runtime.TokenCAKey)
+func genServerCerts(config *config.Control, runtime *config.ControlRuntime) error {
+	regen, err := createSigningCertKey("k3s-token", runtime.ServerCA, runtime.ServerCAKey)
 	if err != nil {
 		return err
 	}
@@ -460,8 +459,8 @@ func genTokenCerts(config *config.Control, runtime *config.ControlRuntime) error
 			DNSNames: []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes", "localhost"},
 			IPs:      []net.IP{apiServerServiceIP, localhostIP},
 		}, x509KeyClientUsage,
-		runtime.TokenCA, runtime.TokenCAKey,
-		runtime.NodeCert, runtime.NodeKey); err != nil {
+		runtime.ServerCA, runtime.ServerCAKey,
+		runtime.ServingKubeAPICert, runtime.ServingKubeAPIKey); err != nil {
 		return err
 	}
 

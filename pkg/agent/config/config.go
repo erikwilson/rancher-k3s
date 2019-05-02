@@ -295,8 +295,8 @@ func get(envInfo *cmds.Agent) (*config.Node, error) {
 	nodeConfig.Images = filepath.Join(envInfo.DataDir, "images")
 	nodeConfig.AgentConfig.NodeIP = nodeIP
 	nodeConfig.AgentConfig.NodeName = nodeName
-	nodeConfig.AgentConfig.NodeCertFile = nodeCertFile
-	nodeConfig.AgentConfig.NodeKeyFile = nodeKeyFile
+	nodeConfig.AgentConfig.ServingKubeAPICertFile = nodeCertFile
+	nodeConfig.AgentConfig.ServingKubeAPIKeyFile = nodeKeyFile
 	nodeConfig.AgentConfig.ClusterDNS = controlConfig.ClusterDNS
 	nodeConfig.AgentConfig.ClusterDomain = controlConfig.ClusterDomain
 	nodeConfig.AgentConfig.ResolvConf = locateOrGenerateResolvConf(envInfo)
