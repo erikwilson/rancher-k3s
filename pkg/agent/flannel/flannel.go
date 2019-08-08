@@ -29,6 +29,7 @@ import (
 	log "k8s.io/klog"
 
 	// Backends need to be imported for their init() to get executed and them to register
+	_ "github.com/coreos/flannel/backend/extension"
 	_ "github.com/coreos/flannel/backend/vxlan"
 )
 
