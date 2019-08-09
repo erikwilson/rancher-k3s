@@ -1,0 +1,7 @@
+{
+  "Network": "10.42.0.0/16",
+  "Backend": {
+    "Type": "ipsec",
+    "PSK": "ee9b0c24c5d015f4ed23e84fb1473314a8baa8bee65fcefd659981d59423c6ee718eee681f579cccf18fd5d7f759f736"
+  }
+}
