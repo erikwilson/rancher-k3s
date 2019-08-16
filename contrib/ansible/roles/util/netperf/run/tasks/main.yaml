@@ -1,0 +1,7 @@
+---
+
+- name: Stop old kubernetes perf-tests netperf
+  command: launch-perf-tests-netperf -kubeConfig /etc/rancher/k3s/k3s.yaml -cleanup
+
+- name: Run kubernetes perf-tests netperf
+  command: launch-perf-tests-netperf -kubeConfig /etc/rancher/k3s/k3s.yaml -image local/netperf-latest

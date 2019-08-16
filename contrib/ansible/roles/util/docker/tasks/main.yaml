@@ -1,0 +1,19 @@
+---
+
+- name: Get docker installer
+  get_url:
+    url: https://get.docker.com
+    dest: /tmp/get-docker.sh
+    mode: 0755
+
+- name: Run docker installer
+  shell: /tmp/get-docker.sh
+  args:
+    creates: /usr/bin/docker
+
+- name: Enable and check docker service
+  systemd:
+    name: docker
+    daemon_reload: yes
+    state: restarted
+    enabled: yes

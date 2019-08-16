@@ -1,0 +1,10 @@
+---
+
+- name: Update cache
+  apt:
+    update_cache: yes
+
+- name: Install build-essential
+  package: 
+    name: [ build-essential, pkgconf, libseccomp-dev ]
+    state: present

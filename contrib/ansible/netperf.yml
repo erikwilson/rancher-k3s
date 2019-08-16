@@ -1,0 +1,14 @@
+---
+
+- hosts: cluster
+  become: yes
+  roles:
+    - { role: util/docker }
+    - { role: util/golang }
+    - { role: util/build-essential }
+    - { role: util/netperf/fetch }
+    - { role: util/netperf/build/cmd }
+    - { role: util/netperf/build/image }
+
+- include: site.yml
+- include: roles/util/run-dstat-netperf.yml

@@ -1,0 +1,12 @@
+---
+
+- name: Install golang
+  get_url:
+    url: https://raw.githubusercontent.com/udhos/update-golang/master/update-golang.sh
+    dest: /tmp/update-golang.sh
+    mode: 0755
+
+- name: Run installer
+  shell: /tmp/update-golang.sh
+  args:
+    creates: /usr/local/go/

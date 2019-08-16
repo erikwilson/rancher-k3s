@@ -1,12 +1,12 @@
 ---
 
-- hosts: k3s-cluster
+- hosts: cluster
   gather_facts: yes
   become: yes
   roles:
-    - { role: download }
-    - { role: raspbian }
-
+    - { role: k3s/build }
+#    - { role: k3s/download }
+#    - { role: raspbian }
 
 - hosts: master
 #  gather_facts: yes

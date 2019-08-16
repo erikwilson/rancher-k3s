@@ -1,4 +1,8 @@
 k3s_version: v0.8.1
-ansible_user: debian
+ansible_user: ubuntu
 systemd_dir: /etc/systemd/system
 master_ip: "{{ hostvars[groups['master'][0]]['ansible_host'] | default(groups['master'][0]) }}"
+k3s_git_url: https://github.com/rancher/k3s
+k3s_git_branch: master
+netperf_git_url: https://github.com/erikwilson/kubernetes-perf-tests
+netperf_git_branch: master

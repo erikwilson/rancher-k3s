@@ -1,0 +1,49 @@
+---
+
+- name: Create rancher directory
+  file:
+    path: ~/go/src/github.com/rancher/
+    state: directory
+
+- name: Check if the k3s directory exists
+  stat:
+    path: ~/go/src/github.com/rancher/k3s/
+  register: build_dir
+
+- name: Get rancher k3s
+  command: git clone -q {{ k3s_git_url }} k3s
+  args:
+    chdir: ~/go/src/github.com/rancher/
+    creates: ~/go/src/github.com/rancher/k3s/
+  when: build_dir.stat.exists == False
+
+- name: Update k3s
+  command: git fetch -q --all
+  args:
+    chdir: ~/go/src/github.com/rancher/k3s/
+  when: build_dir.stat.exists == True
+
+- name: Set k3s branch
+  command: git reset --hard origin/{{ k3s_git_branch }}
+  args:
+    chdir: ~/go/src/github.com/rancher/k3s/
+
+- name: Download k3s 
+  shell: >-
+    ./scripts/download
+  args:
+    chdir: ~/go/src/github.com/rancher/k3s/
+    creates: /usr/local/bin/k3s/bin/
+  environment:
+    PATH: "{{ ansible_env.PATH }}:/usr/local/go/bin/"
+
+- name: Build k3s
+  shell: >-
+    ./scripts/build && 
+    ./scripts/package-cli &&
+    cp dist/artifacts/k3s /usr/local/bin/
+  args:
+    chdir: ~/go/src/github.com/rancher/k3s/
+    creates: /usr/local/bin/k3s
+  environment:
+    PATH: "{{ ansible_env.PATH }}:/usr/local/go/bin/"

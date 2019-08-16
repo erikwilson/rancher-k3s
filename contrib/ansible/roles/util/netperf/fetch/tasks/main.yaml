@@ -1,0 +1,29 @@
+---
+
+- name: Create kubernetes directory
+  file:
+    path: ~/go/src/github.com/kubernetes/
+    state: directory
+
+- name: Check that kubernetes perf-tests exists
+  stat:
+    path: ~/go/src/github.com/kubernetes/perf-tests/
+  register: perf_dir
+
+- name: Get kubernetes perf-tests
+  command: git clone -q {{ netperf_git_url }} perf-tests
+  args:
+    chdir: ~/go/src/github.com/kubernetes/
+    creates: ~/go/src/github.com/kubernetes/perf-tests/network/benchmarks/netperf
+  when: perf_dir.stat.exists == False
+
+- name: Update perf-tests
+  shell: git fetch -q --all
+  args:
+    chdir: ~/go/src/github.com/kubernetes/perf-tests/
+  when: perf_dir.stat.exists == True
+
+- name: Set perf-tests branch
+  shell: git reset --hard origin/{{ netperf_git_branch }}
+  args:
+    chdir: ~/go/src/github.com/kubernetes/perf-tests/

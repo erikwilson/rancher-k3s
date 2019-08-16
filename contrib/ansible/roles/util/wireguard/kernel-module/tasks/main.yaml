@@ -1,0 +1,10 @@
+---
+
+- name: Add wireguard repo
+  become: true
+  command: add-apt-repository ppa:wireguard/wireguard
+
+- name: Install wireguard kernel module
+  package: 
+    name: 'wireguard'
+    state: present

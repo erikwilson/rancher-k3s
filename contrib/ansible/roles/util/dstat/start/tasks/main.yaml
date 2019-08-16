@@ -1,0 +1,59 @@
+---
+
+- name: Update cache
+  apt:
+    update_cache: yes
+
+- name: Install dstat
+  package: 
+    name: 'dstat'
+    state: present
+
+- name: Check that the dstat pid exists
+  stat:
+    path: /var/run/dstat.pid
+  register: pid_file
+
+- name: Stop dstat
+  command: >-
+    start-stop-daemon
+      --stop
+      --pidfile /var/run/dstat.pid
+  when: pid_file.stat.exists == True 
+
+- name: Delete dstats
+  file:
+    path: /var/log/dstat.csv
+    state: absent
+
+- name: Delete dstats
+  file:
+    path: /var/run/dstat.pid
+    state: absent
+
+- name: Run dstat
+  become: true
+  command: >-
+    start-stop-daemon
+      --start
+      --background
+      --quiet
+      --make-pidfile
+      --pidfile /var/run/dstat.pid
+      --exec /usr/bin/dstat --
+        --nocolor
+        --noheaders
+        --noupdate
+        --time
+        --cpu
+        --mem
+        --load
+        --net
+        --output /var/log/dstat.csv
+        60
+  args:
+    creates: /var/run/dstat.pid
+
+- name: Wait a couple minutes
+  pause:
+    minutes: 2

@@ -1,0 +1,16 @@
+---
+
+- name: Create agent air-gap images directory
+  file:
+    path: /var/lib/rancher/k3s/agent/images/
+    state: directory
+
+- name: Build kubernetes perf-tests netperf image
+  shell: >-
+    make docker 2>&1 && 
+    docker save local/netperf-latest -o /var/lib/rancher/k3s/agent/images/netperf.tar
+  args:
+    chdir: ~/go/src/github.com/kubernetes/perf-tests/network/benchmarks/netperf
+    creates: /var/lib/rancher/k3s/agent/images/netperf.tar
+  environment:
+    PATH: "{{ ansible_env.PATH }}:/usr/local/go/bin/"

@@ -1,0 +1,16 @@
+---
+
+- hosts: cluster
+  become: yes
+  roles:
+    - { role: util/dstat/start }
+
+- hosts: master
+  become: yes
+  roles:
+    - { role: util/netperf/run }
+
+- hosts: cluster
+  become: yes
+  roles:
+    - { role: util/dstat/stop }
