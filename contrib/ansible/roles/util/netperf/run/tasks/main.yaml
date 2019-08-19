@@ -1,7 +1,11 @@
 ---
 
 - name: Stop old kubernetes perf-tests netperf
-  command: launch-perf-tests-netperf -kubeConfig /etc/rancher/k3s/k3s.yaml -cleanup
+  command: ./launch -kubeConfig /etc/rancher/k3s/k3s.yaml -cleanup
+  args:
+    chdir: ~/go/src/github.com/kubernetes/perf-tests/network/benchmarks/netperf
 
 - name: Run kubernetes perf-tests netperf
-  command: launch-perf-tests-netperf -kubeConfig /etc/rancher/k3s/k3s.yaml -image local/netperf-latest
+  command: ./launch -kubeConfig /etc/rancher/k3s/k3s.yaml -image local/netperf-latest -args="-mssMin=1460"
+  args:
+    chdir: ~/go/src/github.com/kubernetes/perf-tests/network/benchmarks/netperf

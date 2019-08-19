@@ -8,7 +8,7 @@
 - name: Wait a couple minutes
   pause:
     minutes: 2
-    when: pid_file.stat.exists == True 
+  when: pid_file.stat.exists == True
 
 - name: Stop dstat
   become: true
@@ -16,22 +16,22 @@
     start-stop-daemon
       --stop
       --pidfile /var/run/dstat.pid
-  when: pid_file.stat.exists == True 
+  when: pid_file.stat.exists == True
 
 - name: Get dstats
   fetch:
     src: /var/log/dstat.csv
     dest: ./output/
-  when: pid_file.stat.exists == True 
+  when: pid_file.stat.exists == True
 
 - name: Delete dstats
   file:
     path: /var/log/dstat.csv
     state: absent
-  when: pid_file.stat.exists == True 
+  when: pid_file.stat.exists == True
 
 - name: Delete dstats
   file:
     path: /var/run/dstat.pid
     state: absent
-  when: pid_file.stat.exists == True 
+  when: pid_file.stat.exists == True

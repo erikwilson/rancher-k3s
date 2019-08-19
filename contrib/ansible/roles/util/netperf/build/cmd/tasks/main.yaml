@@ -1,9 +1,8 @@
 ---
 
 - name: Compile kubernetes perf-tests netperf
-  command: go build -o /usr/local/bin/launch-perf-tests-netperf launch.go
+  command: go build launch.go
   args:
     chdir: ~/go/src/github.com/kubernetes/perf-tests/network/benchmarks/netperf
-    creates: /usr/local/bin/launch-perf-tests-netperf
   environment:
     PATH: "{{ ansible_env.PATH }}:/usr/local/go/bin/"
