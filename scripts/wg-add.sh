@@ -23,12 +23,12 @@ modprobe tun
 ip link add "$1" type wireguard && exit
 
 # try boringtun and let it drop privileges
-/tmp/boringtun "$1" && auto-mtu "$1" && exit
+boringtun "$1" && auto-mtu "$1" && exit
 
 # try boringtun w/o dropping privileges
-WG_SUDO=1 /tmp/boringtun "$1" && auto-mtu "$1" && exit
+WG_SUDO=1 boringtun "$1" && auto-mtu "$1" && exit
 
-# try wireguard-go
-WG_I_PREFER_BUGGY_USERSPACE_TO_POLISHED_KMOD=1 /tmp/wireguard-go "$1" && auto-mtu "$1" && exit
+# try wireguard-go - p.s. should not use wireguard-go, it leaks memory
+WG_I_PREFER_BUGGY_USERSPACE_TO_POLISHED_KMOD=1 wireguard-go "$1" && auto-mtu "$1" && exit
 
 exit 1
