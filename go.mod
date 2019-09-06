@@ -6,7 +6,7 @@ replace (
 	github.com/containerd/containerd => github.com/rancher/containerd v1.2.8-k3s.1
 	github.com/containerd/cri => github.com/rancher/cri v1.2.8-k3s.1
 	github.com/containernetworking/plugins => github.com/rancher/plugins v0.7.5-k3s1
-	github.com/coreos/flannel => github.com/ibuildthecloud/flannel v0.10.1-0.20190131215433-823afe66b226
+	github.com/coreos/flannel => github.com/erikwilson/flannel v0.10.1-0.20190906173909-e153c390fcac
 	github.com/kubernetes-sigs/cri-tools => github.com/rancher/cri-tools v1.15.0-k3s.2
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009
 	github.com/opencontainers/runtime-spec => github.com/opencontainers/runtime-spec v0.0.0-20180911193056-5684b8af48c1
@@ -45,8 +45,7 @@ replace (
 require (
 	github.com/Microsoft/go-winio v0.4.12 // indirect
 	github.com/alexflint/go-filemutex v0.0.0-20171022225611-72bdc8eae2ae // indirect
-	github.com/bhendo/go-powershell v0.0.0-20190719160123-219e7fb4e41e // indirect
-	github.com/buger/jsonparser v0.0.0-20181115193947-bf1c66bbce23 // indirect
+	github.com/bronze1man/goStrongswanVici v0.0.0-20190828090544-27d02f80ba40 // indirect
 	github.com/containerd/cgroups v0.0.0-20190328223300-4994991857f9 // indirect
 	github.com/containerd/console v0.0.0-20180822173158-c12b1e7919c1 // indirect
 	github.com/containerd/containerd v1.2.8
@@ -76,9 +75,6 @@ require (
 	github.com/hashicorp/errwrap v0.0.0-20141028054710-7554cd9344ce // indirect
 	github.com/hashicorp/go-multierror v0.0.0-20161216184304-ed905158d874 // indirect
 	github.com/j-keck/arping v1.0.0 // indirect
-	github.com/juju/errors v0.0.0-20190806202954-0232dcc7464d // indirect
-	github.com/juju/loggo v0.0.0-20190526231331-6e530bcce5d8 // indirect
-	github.com/juju/testing v0.0.0-20190723135506-ce30eb24acd2 // indirect
 	github.com/kubernetes-sigs/cri-tools v1.15.0
 	github.com/lib/pq v1.1.1
 	github.com/mattn/go-sqlite3 v1.10.0
@@ -113,7 +109,6 @@ require (
 	golang.org/x/net v0.0.0-20190812203447-cdfb69ac37fc
 	golang.org/x/sys v0.0.0-20190616124812-15dcb6c0061f
 	google.golang.org/grpc v1.20.1
-	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22 // indirect
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/apiserver v0.0.0

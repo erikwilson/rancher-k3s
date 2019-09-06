@@ -25,6 +25,7 @@ import (
 
 	"github.com/coreos/flannel/pkg/ip"
 	"github.com/coreos/flannel/subnet"
+	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,7 +39,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog"
 )
 
 var (
@@ -49,11 +49,16 @@ const (
 	resyncPeriod              = 5 * time.Minute
 	nodeControllerSyncTimeout = 10 * time.Minute
 
+	subnetKubeManagedAnnotation        = "flannel.alpha.coreos.com/kube-subnet-manager"
+	backendDataAnnotation              = "flannel.alpha.coreos.com/backend-data"
+	backendTypeAnnotation              = "flannel.alpha.coreos.com/backend-type"
+	backendPublicIPAnnotation          = "flannel.alpha.coreos.com/public-ip"
+	backendPublicIPOverwriteAnnotation = "flannel.alpha.coreos.com/public-ip-overwrite"
+
 	netConfPath = "/etc/kube-flannel/net-conf.json"
 )
 
 type kubeSubnetManager struct {
-	annotations    annotations
 	client         clientset.Interface
 	nodeName       string
 	nodeStore      listers.NodeLister
@@ -62,7 +67,7 @@ type kubeSubnetManager struct {
 	events         chan subnet.Event
 }
 
-func NewSubnetManager(apiUrl, flannelConf, kubeconfig, prefix string) (subnet.Manager, error) {
+func NewSubnetManager(apiUrl, kubeconfig string) (subnet.Manager, error) {
 
 	var cfg *rest.Config
 	var err error
@@ -105,10 +110,7 @@ func NewSubnetManager(apiUrl, flannelConf, kubeconfig, prefix string) (subnet.Ma
 		}
 	}
 
-	if flannelConf == "" {
-		flannelConf = netConfPath
-	}
-	netConf, err := ioutil.ReadFile(flannelConf)
+	netConf, err := ioutil.ReadFile(netConfPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read net conf: %v", err)
 	}
@@ -118,31 +120,26 @@ func NewSubnetManager(apiUrl, flannelConf, kubeconfig, prefix string) (subnet.Ma
 		return nil, fmt.Errorf("error parsing subnet config: %s", err)
 	}
 
-	sm, err := newKubeSubnetManager(c, sc, nodeName, prefix)
+	sm, err := newKubeSubnetManager(c, sc, nodeName)
 	if err != nil {
 		return nil, fmt.Errorf("error creating network manager: %s", err)
 	}
 	go sm.Run(context.Background())
 
-	klog.Infof("Waiting %s for node controller to sync", nodeControllerSyncTimeout)
+	glog.Infof("Waiting %s for node controller to sync", nodeControllerSyncTimeout)
 	err = wait.Poll(time.Second, nodeControllerSyncTimeout, func() (bool, error) {
 		return sm.nodeController.HasSynced(), nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error waiting for nodeController to sync state: %v", err)
 	}
-	klog.Infof("Node controller sync successful")
+	glog.Infof("Node controller sync successful")
 
 	return sm, nil
 }
 
-func newKubeSubnetManager(c clientset.Interface, sc *subnet.Config, nodeName, prefix string) (*kubeSubnetManager, error) {
-	var err error
+func newKubeSubnetManager(c clientset.Interface, sc *subnet.Config, nodeName string) (*kubeSubnetManager, error) {
 	var ksm kubeSubnetManager
-	ksm.annotations, err = newAnnotations(prefix)
-	if err != nil {
-		return nil, err
-	}
 	ksm.client = c
 	ksm.nodeName = nodeName
 	ksm.subnetConf = sc
@@ -164,21 +161,6 @@ func newKubeSubnetManager(c clientset.Interface, sc *subnet.Config, nodeName, pr
 			},
 			UpdateFunc: ksm.handleUpdateLeaseEvent,
 			DeleteFunc: func(obj interface{}) {
-				node, isNode := obj.(*v1.Node)
-				// We can get DeletedFinalStateUnknown instead of *api.Node here and we need to handle that correctly.
-				if !isNode {
-					deletedState, ok := obj.(cache.DeletedFinalStateUnknown)
-					if !ok {
-						klog.Infof("Error received unexpected object: %v", obj)
-						return
-					}
-					node, ok = deletedState.Obj.(*v1.Node)
-					if !ok {
-						klog.Infof("Error deletedFinalStateUnknown contained non-Node object: %v", deletedState.Obj)
-						return
-					}
-					obj = node
-				}
 				ksm.handleAddLeaseEvent(subnet.EventRemoved, obj)
 			},
 		},
@@ -191,13 +173,13 @@ func newKubeSubnetManager(c clientset.Interface, sc *subnet.Config, nodeName, pr
 
 func (ksm *kubeSubnetManager) handleAddLeaseEvent(et subnet.EventType, obj interface{}) {
 	n := obj.(*v1.Node)
-	if s, ok := n.Annotations[ksm.annotations.SubnetKubeManaged]; !ok || s != "true" {
+	if s, ok := n.Annotations[subnetKubeManagedAnnotation]; !ok || s != "true" {
 		return
 	}
 
-	l, err := ksm.nodeToLease(*n)
+	l, err := nodeToLease(*n)
 	if err != nil {
-		klog.Infof("Error turning node %q to lease: %v", n.ObjectMeta.Name, err)
+		glog.Infof("Error turning node %q to lease: %v", n.ObjectMeta.Name, err)
 		return
 	}
 	ksm.events <- subnet.Event{et, l}
@@ -206,18 +188,18 @@ func (ksm *kubeSubnetManager) handleAddLeaseEvent(et subnet.EventType, obj inter
 func (ksm *kubeSubnetManager) handleUpdateLeaseEvent(oldObj, newObj interface{}) {
 	o := oldObj.(*v1.Node)
 	n := newObj.(*v1.Node)
-	if s, ok := n.Annotations[ksm.annotations.SubnetKubeManaged]; !ok || s != "true" {
+	if s, ok := n.Annotations[subnetKubeManagedAnnotation]; !ok || s != "true" {
 		return
 	}
-	if o.Annotations[ksm.annotations.BackendData] == n.Annotations[ksm.annotations.BackendData] &&
-		o.Annotations[ksm.annotations.BackendType] == n.Annotations[ksm.annotations.BackendType] &&
-		o.Annotations[ksm.annotations.BackendPublicIP] == n.Annotations[ksm.annotations.BackendPublicIP] {
+	if o.Annotations[backendDataAnnotation] == n.Annotations[backendDataAnnotation] &&
+		o.Annotations[backendTypeAnnotation] == n.Annotations[backendTypeAnnotation] &&
+		o.Annotations[backendPublicIPAnnotation] == n.Annotations[backendPublicIPAnnotation] {
 		return // No change to lease
 	}
 
-	l, err := ksm.nodeToLease(*n)
+	l, err := nodeToLease(*n)
 	if err != nil {
-		klog.Infof("Error turning node %q to lease: %v", n.ObjectMeta.Name, err)
+		glog.Infof("Error turning node %q to lease: %v", n.ObjectMeta.Name, err)
 		return
 	}
 	ksm.events <- subnet.Event{subnet.EventAdded, l}
@@ -245,24 +227,24 @@ func (ksm *kubeSubnetManager) AcquireLease(ctx context.Context, attrs *subnet.Le
 	if err != nil {
 		return nil, err
 	}
-	if n.Annotations[ksm.annotations.BackendData] != string(bd) ||
-		n.Annotations[ksm.annotations.BackendType] != attrs.BackendType ||
-		n.Annotations[ksm.annotations.BackendPublicIP] != attrs.PublicIP.String() ||
-		n.Annotations[ksm.annotations.SubnetKubeManaged] != "true" ||
-		(n.Annotations[ksm.annotations.BackendPublicIPOverwrite] != "" && n.Annotations[ksm.annotations.BackendPublicIPOverwrite] != attrs.PublicIP.String()) {
-		n.Annotations[ksm.annotations.BackendType] = attrs.BackendType
-		n.Annotations[ksm.annotations.BackendData] = string(bd)
-		if n.Annotations[ksm.annotations.BackendPublicIPOverwrite] != "" {
-			if n.Annotations[ksm.annotations.BackendPublicIP] != n.Annotations[ksm.annotations.BackendPublicIPOverwrite] {
-				klog.Infof("Overriding public ip with '%s' from node annotation '%s'",
-					n.Annotations[ksm.annotations.BackendPublicIPOverwrite],
-					ksm.annotations.BackendPublicIPOverwrite)
-				n.Annotations[ksm.annotations.BackendPublicIP] = n.Annotations[ksm.annotations.BackendPublicIPOverwrite]
+	if n.Annotations[backendDataAnnotation] != string(bd) ||
+		n.Annotations[backendTypeAnnotation] != attrs.BackendType ||
+		n.Annotations[backendPublicIPAnnotation] != attrs.PublicIP.String() ||
+		n.Annotations[subnetKubeManagedAnnotation] != "true" ||
+		(n.Annotations[backendPublicIPOverwriteAnnotation] != "" && n.Annotations[backendPublicIPOverwriteAnnotation] != attrs.PublicIP.String()) {
+		n.Annotations[backendTypeAnnotation] = attrs.BackendType
+		n.Annotations[backendDataAnnotation] = string(bd)
+		if n.Annotations[backendPublicIPOverwriteAnnotation] != "" {
+			if n.Annotations[backendPublicIPAnnotation] != n.Annotations[backendPublicIPOverwriteAnnotation] {
+				glog.Infof("Overriding public ip with '%s' from node annotation '%s'",
+					n.Annotations[backendPublicIPOverwriteAnnotation],
+					backendPublicIPOverwriteAnnotation)
+				n.Annotations[backendPublicIPAnnotation] = n.Annotations[backendPublicIPOverwriteAnnotation]
 			}
 		} else {
-			n.Annotations[ksm.annotations.BackendPublicIP] = attrs.PublicIP.String()
+			n.Annotations[backendPublicIPAnnotation] = attrs.PublicIP.String()
 		}
-		n.Annotations[ksm.annotations.SubnetKubeManaged] = "true"
+		n.Annotations[subnetKubeManagedAnnotation] = "true"
 
 		oldData, err := json.Marshal(cachedNode)
 		if err != nil {
@@ -303,18 +285,18 @@ func (ksm *kubeSubnetManager) WatchLeases(ctx context.Context, cursor interface{
 }
 
 func (ksm *kubeSubnetManager) Run(ctx context.Context) {
-	klog.Infof("Starting kube subnet manager")
+	glog.Infof("Starting kube subnet manager")
 	ksm.nodeController.Run(ctx.Done())
 }
 
-func (ksm *kubeSubnetManager) nodeToLease(n v1.Node) (l subnet.Lease, err error) {
-	l.Attrs.PublicIP, err = ip.ParseIP4(n.Annotations[ksm.annotations.BackendPublicIP])
+func nodeToLease(n v1.Node) (l subnet.Lease, err error) {
+	l.Attrs.PublicIP, err = ip.ParseIP4(n.Annotations[backendPublicIPAnnotation])
 	if err != nil {
 		return l, err
 	}
 
-	l.Attrs.BackendType = n.Annotations[ksm.annotations.BackendType]
-	l.Attrs.BackendData = json.RawMessage(n.Annotations[ksm.annotations.BackendData])
+	l.Attrs.BackendType = n.Annotations[backendTypeAnnotation]
+	l.Attrs.BackendData = json.RawMessage(n.Annotations[backendDataAnnotation])
 
 	_, cidr, err := net.ParseCIDR(n.Spec.PodCIDR)
 	if err != nil {

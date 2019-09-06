@@ -17,7 +17,7 @@ package subnet
 import (
 	"time"
 
-	log "k8s.io/klog"
+	log "github.com/golang/glog"
 	"golang.org/x/net/context"
 
 	"github.com/coreos/flannel/pkg/ip"
