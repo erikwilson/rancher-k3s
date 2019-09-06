@@ -48,7 +48,7 @@ func NewCharonIKEDaemon(ctx context.Context, wg sync.WaitGroup, espProposal stri
 	addr := strings.Split("unix:///var/run/charon.vici", "://")
 	charon.viciUri = Uri{addr[0], addr[1]}
 
-	cmd, err := charon.runBundled("/usr/lib/strongswan/charon")
+	cmd, err := charon.runBundled("charon")
 
 	if err != nil {
 		log.Errorf("Error starting charon daemon: %v", err)
